@@ -1,0 +1,115 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_Delphix_FileFormats_Upload_name": {
+            "defaultValue": "Delphix-FileFormats-Upload",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_Delphix_FileFormats_Upload_name')]",
+            "location": "centralus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "Authorization": {
+                                            "type": "string"
+                                        },
+                                        "fileFormat": {
+                                            "type": "string"
+                                        },
+                                        "fileFormatType": {
+                                            "type": "string"
+                                        },
+                                        "fileName": {
+                                            "type": "string"
+                                        },
+                                        "maskingEngineIp": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "HTTP": {
+                            "runAfter": {},
+                            "type": "Http",
+                            "inputs": {
+                                "body": {
+                                    "$content-type": "multipart/form-data",
+                                    "$multipart": [
+                                        {
+                                            "body": "@{triggerBody()?['fileFormatType']}",
+                                            "headers": {
+                                                "Content-Disposition": "form-data; name=\"fileFormatType\""
+                                            }
+                                        },
+                                        {
+                                            "Content-Type": "text/csv",
+                                            "body": "@{triggerBody()?['fileFormat']}",
+                                            "headers": {
+                                                "Content-Disposition": "form-data; name=\"fileFormat\"; filename=\"@{triggerBody()?['fileName']}\""
+                                            }
+                                        }
+                                    ]
+                                },
+                                "headers": {
+                                    "Authorization": "@triggerBody()?['Authorization']",
+                                    "Content-Type": "multipart/form-data"
+                                },
+                                "method": "POST",
+                                "uri": "http://@{triggerBody()?['maskingEngineIp']}/masking/api/v5.1.11/file-formats"
+                            }
+                        },
+                        "Response_Failure": {
+                            "runAfter": {
+                                "HTTP": [
+                                    "Failed"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": "Delphix Response: {\nResponse Code: @{outputs('HTTP')['statusCode']}\nResponse Headers: @{outputs('HTTP')['headers']}\nResponse Body: @{body('HTTP')}\n}",
+                                "statusCode": "@outputs('HTTP')['statusCode']"
+                            }
+                        },
+                        "Response_Success": {
+                            "runAfter": {
+                                "HTTP": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": "Delphix Response: {\nResponse Code: @{outputs('HTTP')['statusCode']}\nResponse Headers: @{outputs('HTTP')['headers']}\nResponse Body: @{body('HTTP')}\n}",
+                                "statusCode": "@outputs('HTTP')['statusCode']"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        }
+    ]
+}
